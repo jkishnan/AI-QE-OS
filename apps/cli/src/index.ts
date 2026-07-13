@@ -2,6 +2,7 @@ import { Command } from "commander";
 import process from "node:process";
 import { PlaywrightGeneratorCapability } from "../../../packages/capabilities/playwright-generator/src/index.js";
 import { CapabilityRegistry } from "../../../packages/core/src/capability-registry.js";
+import { ProjectAnalyzer } from "../../../packages/project-analyzer/src/project-analyzer.js";
 
 const program = new Command();
 const registry = new CapabilityRegistry();
@@ -86,6 +87,24 @@ program
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Unable to run capability "${id}": ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("analyze <path>")
+  .description("Analyze a Playwright project")
+  .action(async (projectPath: string) => {
+    try {
+      const analysis = await new ProjectAnalyzer().analyze(projectPath);
+
+      console.log(`Playwright config: ${analysis.playwrightConfig ?? "Not found"}`);
+      console.log(`Number of page objects: ${analysis.pageObjects.length}`);
+      console.log(`Number of fixtures: ${analysis.fixtures.length}`);
+      console.log(`Number of tests found: ${analysis.tests.length}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Unable to analyze project "${projectPath}": ${message}`);
       process.exitCode = 1;
     }
   });
