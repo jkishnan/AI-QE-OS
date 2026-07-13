@@ -4,13 +4,17 @@ import {
   buildPlaywrightPrompt,
   PlaywrightGeneratorCapability,
 } from "../../../packages/capabilities/playwright-generator/src/index.js";
+import { ContextBuilder } from "../../../packages/context-builder/src/context-builder.js";
 import { CapabilityRegistry } from "../../../packages/core/src/capability-registry.js";
-import { MockLlmProvider } from "../../../packages/llm/src/index.js";
+import {
+  createLlmProvider,
+  MockLlmProvider,
+} from "../../../packages/llm/src/index.js";
 import { ProjectAnalyzer } from "../../../packages/project-analyzer/src/project-analyzer.js";
 
 const program = new Command();
 const registry = new CapabilityRegistry();
-registry.register(new PlaywrightGeneratorCapability());
+registry.register(new PlaywrightGeneratorCapability(createLlmProvider()));
 
 interface RunOptions {
   request: string;
@@ -176,6 +180,26 @@ program
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Unable to build prompt preview: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("context <path>")
+  .description("Build a bounded context for a Playwright project")
+  .action(async (projectPath: string) => {
+    try {
+      const analysis = await new ProjectAnalyzer().analyze(projectPath);
+      const context = new ContextBuilder().build(analysis);
+
+      console.log("Context Summary");
+      console.log("----------------");
+      console.log(`Files: ${context.totalFiles}`);
+      console.log(`Characters: ${context.totalCharacters}`);
+      console.log(`Estimated Tokens: ${context.estimatedTokenCount}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Unable to build project context: ${message}`);
       process.exitCode = 1;
     }
   });
