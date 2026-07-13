@@ -1,17 +1,17 @@
 import { Command } from "commander";
 import { config as loadEnvironment } from "dotenv";
 import process from "node:process";
-import {
-  buildPlaywrightPrompt,
-  PlaywrightGeneratorCapability,
-} from "../../../packages/capabilities/playwright-generator/src/index.js";
+import { buildPlaywrightPrompt } from "../../../packages/capabilities/playwright-generator/src/index.js";
 import { ContextBuilder } from "../../../packages/context-builder/src/context-builder.js";
-import { CapabilityRegistry } from "../../../packages/core/src/capability-registry.js";
 import {
   loadProjectConfig,
   ProjectConfigFileNotFoundError,
 } from "../../../packages/core/src/config.js";
 import type { ProjectConfig } from "../../../packages/core/src/config.js";
+import {
+  listLoadedPlugins,
+  loadCapabilities,
+} from "../../../packages/core/src/plugin-loader.js";
 import {
   createLlmProvider,
   MockLlmProvider,
@@ -21,8 +21,7 @@ import { ProjectAnalyzer } from "../../../packages/project-analyzer/src/project-
 loadEnvironment({ quiet: true });
 
 const program = new Command();
-const registry = new CapabilityRegistry();
-registry.register(new PlaywrightGeneratorCapability(createLlmProvider()));
+const registry = loadCapabilities();
 
 interface RunOptions {
   request: string;
@@ -80,6 +79,24 @@ program
   });
 
 program
+  .command("plugins")
+  .description("List loaded plugins")
+  .action(() => {
+    const plugins = listLoadedPlugins();
+
+    console.log("Loaded plugins:");
+
+    if (plugins.length === 0) {
+      console.log("No plugins loaded.");
+      return;
+    }
+
+    for (const plugin of plugins) {
+      console.log(`- ${plugin.name} (${plugin.id}) v${plugin.version}`);
+    }
+  });
+
+program
   .command("run <id>")
   .description("Run a registered capability")
   .requiredOption("--request <text>", "Capability request")
@@ -89,12 +106,12 @@ program
   .action(async (id: string, options: RunOptions) => {
     try {
       const config = await loadRunConfig(options.config);
-      const runRegistry = new CapabilityRegistry();
-      runRegistry.register(
-        new PlaywrightGeneratorCapability(
-          createLlmProvider(config?.llm.provider, config?.llm.model)
-        )
-      );
+      const runRegistry = loadCapabilities({
+        llmProvider: createLlmProvider(
+          config?.llm.provider,
+          config?.llm.model
+        ),
+      });
       const capability = runRegistry.get(id);
       const context = {
         projectRoot: options.project ?? config?.project.root ?? ".",

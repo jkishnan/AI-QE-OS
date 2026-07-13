@@ -10,7 +10,9 @@ Quality Engineering tools are often delivered as isolated scripts or tightly cou
 
 ```mermaid
 flowchart LR
-    CLI[CLI] -->|list / run| Registry[Capability Registry]
+    CLI[CLI] -->|load / plugins| Loader[Plugin Loader]
+    Loader --> Registry[Capability Registry]
+    CLI -->|list / run| Registry
     Registry --> Generator[Playwright Generator]
     Generator --> Analyzer[Project Analyzer]
     Analyzer --> Prompt[Prompt Builder]
@@ -29,6 +31,7 @@ The default provider is deterministic and local (`mock`). An OpenAI Responses AP
 ## Current Features
 
 - Typed capability SDK and duplicate-safe capability registry.
+- Centralized plugin loader with built-in plugin metadata and an external-plugin extension point.
 - `list` and `run` CLI commands for discovering and executing capabilities.
 - Recursive Playwright project analysis for config, page objects, fixtures, and test files.
 - Bounded context selection, configurable file truncation, and estimated token counts.
