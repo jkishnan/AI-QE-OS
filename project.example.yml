@@ -1,6 +1,6 @@
 project:
-  name: playwright-project
-  root: .
+  name: sample-project
+  root: /path/to/your/playwright/project
 
 llm:
   provider: mock
