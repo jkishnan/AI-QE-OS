@@ -1,6 +1,9 @@
 import { Command } from "commander";
 import process from "node:process";
-import { PlaywrightGeneratorCapability } from "../../../packages/capabilities/playwright-generator/src/index.js";
+import {
+  buildPlaywrightPrompt,
+  PlaywrightGeneratorCapability,
+} from "../../../packages/capabilities/playwright-generator/src/index.js";
 import { CapabilityRegistry } from "../../../packages/core/src/capability-registry.js";
 import { MockLlmProvider } from "../../../packages/llm/src/index.js";
 import { ProjectAnalyzer } from "../../../packages/project-analyzer/src/project-analyzer.js";
@@ -13,6 +16,10 @@ interface RunOptions {
   request: string;
   project: string;
   output: string;
+}
+
+interface PromptPreviewOptions {
+  request: string;
 }
 
 program
@@ -72,14 +79,14 @@ program
         console.log("- None");
       }
 
-      console.log("Generated artifacts:");
+      console.log("Generated:");
 
       if (result.artifacts.length > 0) {
         for (const artifact of result.artifacts) {
-          console.log(`- ${artifact.path}`);
+          console.log(artifact.path);
         }
       } else {
-        console.log("- None");
+        console.log("None");
       }
 
       if (!result.success) {
@@ -148,6 +155,27 @@ program
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Unable to test LLM provider: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("prompt-preview <path>")
+  .description("Preview the Playwright generation prompt")
+  .requiredOption("--request <text>", "Test-generation request")
+  .action(async (projectPath: string, options: PromptPreviewOptions) => {
+    try {
+      const analysis = await new ProjectAnalyzer().analyze(projectPath);
+      const prompt = buildPlaywrightPrompt(options.request, analysis);
+
+      console.log("System prompt:");
+      console.log(prompt.systemPrompt);
+      console.log("");
+      console.log("User prompt:");
+      console.log(prompt.userPrompt);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Unable to build prompt preview: ${message}`);
       process.exitCode = 1;
     }
   });
