@@ -98,10 +98,30 @@ program
     try {
       const analysis = await new ProjectAnalyzer().analyze(projectPath);
 
-      console.log(`Playwright config: ${analysis.playwrightConfig ?? "Not found"}`);
+      console.log(
+        `Playwright config: ${analysis.playwrightConfig?.path ?? "Not found"}`
+      );
       console.log(`Number of page objects: ${analysis.pageObjects.length}`);
+      for (const file of analysis.pageObjects) {
+        console.log(`- ${file.path}`);
+      }
+
       console.log(`Number of fixtures: ${analysis.fixtures.length}`);
-      console.log(`Number of tests found: ${analysis.tests.length}`);
+      for (const file of analysis.fixtures) {
+        console.log(`- ${file.path}`);
+      }
+
+      console.log(`Number of tests found: ${analysis.sampleTests.length}`);
+      for (const file of analysis.sampleTests) {
+        console.log(`- ${file.path}`);
+      }
+
+      if (analysis.warnings.length > 0) {
+        console.log("Warnings:");
+        for (const warning of analysis.warnings) {
+          console.log(`- ${warning}`);
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Unable to analyze project "${projectPath}": ${message}`);
