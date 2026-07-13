@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
+import { stat } from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
+
+const NO_TESTS_FOUND_PATTERN = /No tests found/i;
+const NO_TESTS_FOUND_HELP =
+  'Playwright reported "No tests found". The test file may be outside the configured testDir; move it under testDir or update playwright.config.ts.';
 
 export interface ExecutionResult {
   success: boolean;
@@ -17,6 +23,25 @@ export class PlaywrightExecutor {
   ): Promise<ExecutionResult> {
     const startedAt = Date.now();
     const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+    const resolvedTestFile = path.resolve(projectRoot, testFile);
+
+    try {
+      const testFileStats = await stat(resolvedTestFile);
+
+      if (!testFileStats.isFile()) {
+        return this.failureResult(
+          testFile,
+          startedAt,
+          `Test file does not reference a file: ${resolvedTestFile}`
+        );
+      }
+    } catch (error) {
+      return this.failureResult(
+        testFile,
+        startedAt,
+        `Test file was not found or is not readable: ${resolvedTestFile}. ${this.getErrorMessage(error)}`
+      );
+    }
 
     return new Promise((resolve) => {
       let stdout = "";
@@ -29,9 +54,20 @@ export class PlaywrightExecutor {
         }
 
         settled = true;
+        const noTestsFound = NO_TESTS_FOUND_PATTERN.test(
+          `${stdout}\n${stderr}`
+        );
+
+        if (noTestsFound && !stderr.includes(NO_TESTS_FOUND_HELP)) {
+          const separator =
+            stderr.length > 0 && !stderr.endsWith("\n") ? "\n" : "";
+          stderr += `${separator}${NO_TESTS_FOUND_HELP}`;
+        }
+
+        const resolvedExitCode = noTestsFound && exitCode === 0 ? 1 : exitCode;
         resolve({
-          success: exitCode === 0,
-          exitCode,
+          success: resolvedExitCode === 0,
+          exitCode: resolvedExitCode,
           durationMs: Date.now() - startedAt,
           stdout,
           stderr,
@@ -74,5 +110,20 @@ export class PlaywrightExecutor {
 
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private failureResult(
+    testFile: string,
+    startedAt: number,
+    stderr: string
+  ): ExecutionResult {
+    return {
+      success: false,
+      exitCode: -1,
+      durationMs: Date.now() - startedAt,
+      stdout: "",
+      stderr,
+      testFile,
+    };
   }
 }

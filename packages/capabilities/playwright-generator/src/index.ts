@@ -9,6 +9,7 @@ import type {
 } from "../../../capability-sdk/src/types.js";
 import { MockLlmProvider } from "../../../llm/src/index.js";
 import type { LlmProvider } from "../../../llm/src/index.js";
+import { resolveGeneratedTestPath } from "../../../execution-engine/src/index.js";
 import {
   ProjectAnalyzer,
   type ProjectAnalysis,
@@ -47,7 +48,9 @@ export class PlaywrightGeneratorCapability implements Capability {
     const analysis = await this.analyzeProject(context.projectRoot);
     const generatedCode = await this.generateTest(context.request, analysis);
     const artifact = await this.saveArtifact(
+      context.projectRoot,
       context.outputDirectory,
+      analysis.playwrightConfig?.content,
       generatedCode
     );
 
@@ -71,16 +74,25 @@ export class PlaywrightGeneratorCapability implements Capability {
   }
 
   private async saveArtifact(
+    projectRoot: string,
     outputDirectory: string,
+    playwrightConfigContent: string | undefined,
     generated: {
       text: string;
       provider: string;
       model: string;
     }
   ): Promise<CapabilityArtifact & { provider: string; model: string }> {
-    const artifactPath = path.join(outputDirectory, "generated.spec.ts");
+    const artifactPath = resolveGeneratedTestPath({
+      projectRoot,
+      outputDirectory,
+      ...(playwrightConfigContent === undefined
+        ? {}
+        : { playwrightConfigContent }),
+    });
+    const artifactDirectory = path.dirname(artifactPath);
 
-    await mkdir(outputDirectory, { recursive: true });
+    await mkdir(artifactDirectory, { recursive: true });
 
     const content = generated.text.endsWith("\n")
       ? generated.text
