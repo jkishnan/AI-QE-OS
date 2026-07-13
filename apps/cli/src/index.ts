@@ -2,6 +2,7 @@ import { Command } from "commander";
 import process from "node:process";
 import { PlaywrightGeneratorCapability } from "../../../packages/capabilities/playwright-generator/src/index.js";
 import { CapabilityRegistry } from "../../../packages/core/src/capability-registry.js";
+import { MockLlmProvider } from "../../../packages/llm/src/index.js";
 import { ProjectAnalyzer } from "../../../packages/project-analyzer/src/project-analyzer.js";
 
 const program = new Command();
@@ -125,6 +126,28 @@ program
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Unable to analyze project "${projectPath}": ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("llm-test")
+  .description("Test the configured LLM provider")
+  .action(async () => {
+    try {
+      const provider = new MockLlmProvider();
+      const response = await provider.generate({
+        systemPrompt: "Generate Playwright tests in TypeScript.",
+        userPrompt: "Generate a placeholder test.",
+      });
+
+      console.log(`Provider: ${response.provider}`);
+      console.log(`Model: ${response.model}`);
+      console.log("Generated text:");
+      console.log(response.text);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Unable to test LLM provider: ${message}`);
       process.exitCode = 1;
     }
   });
