@@ -41,6 +41,7 @@ interface ConfigCheckOptions {
 
 interface ExecuteOptions {
   project: string;
+  results: string;
 }
 
 async function loadRunConfig(configPath?: string): Promise<ProjectConfig | null> {
@@ -283,17 +284,28 @@ program
   .command("execute <test-file>")
   .description("Execute a Playwright test file")
   .requiredOption("--project <project-root>", "Playwright project root")
+  .option(
+    "--results <path>",
+    "Directory for structured test results",
+    "./test-results/ai-qe-os"
+  )
   .action(async (testFile: string, options: ExecuteOptions) => {
     try {
       const result = await new PlaywrightExecutor().execute(
         testFile,
-        options.project
+        options.project,
+        options.results
       );
 
       console.log(`Test file: ${result.testFile}`);
       console.log(`Status: ${result.success ? "PASS" : "FAIL"}`);
       console.log(`Exit code: ${result.exitCode}`);
       console.log(`Duration: ${result.durationMs} ms`);
+      console.log(`Report: ${result.reportPath}`);
+      console.log(`Total: ${result.totalTests}`);
+      console.log(`Passed: ${result.passedTests}`);
+      console.log(`Failed: ${result.failedTests}`);
+      console.log(`Skipped: ${result.skippedTests}`);
       console.log("Stdout:");
       console.log(result.stdout || "(empty)");
 

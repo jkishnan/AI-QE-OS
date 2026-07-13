@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx apps/cli/src/index.ts",
-    "test": "node --import tsx --test packages/execution-engine/src/test-path-resolver.test.ts",
+    "test": "node --import tsx --test packages/execution-engine/src/test-path-resolver.test.ts packages/execution-engine/src/json-report-parser.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },
