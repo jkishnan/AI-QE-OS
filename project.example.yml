@@ -1,13 +1,13 @@
 project:
-  name: sample-project
-  root: /path/to/your/playwright/project
+  name: sample-playwright-project
+  root: /path/to/playwright/project
 
 llm:
   provider: mock
   model: mock-playwright-0.1
 
 generation:
-  outputDirectory: ./generated
+  outputDirectory: ./tests/generated
 
 context:
   maxPageObjects: 5

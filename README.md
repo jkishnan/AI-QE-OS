@@ -1,88 +1,191 @@
 # AI-QE OS
 
-AI-QE OS is an open-source, TypeScript-based Quality Engineering platform for building composable, AI-assisted testing capabilities. Its first end-to-end workflow analyzes an existing Playwright project, assembles relevant project context, constructs a test-generation prompt, and writes a generated Playwright test artifact through a configurable LLM provider.
+AI-QE OS is a TypeScript-based, plugin-oriented Quality Engineering platform. It analyzes existing Playwright projects, builds project-aware prompts, routes generation through configurable LLM providers, writes generated test artifacts into the target project, and executes Playwright tests with structured result collection.
 
 ## Why AI-QE OS?
 
-Quality Engineering tools are often delivered as isolated scripts or tightly coupled products. AI-QE OS explores a plugin-oriented alternative: capabilities implement a shared contract, register with a central registry, and reuse platform services such as project analysis, context selection, prompt construction, and LLM access. This design makes it possible to add future capabilities—failure analysis, accessibility auditing, flaky-test detection, and more—without rebuilding the surrounding CLI and infrastructure.
+Quality-engineering automation often grows as isolated scripts tied to one repository or provider. AI-QE OS separates reusable capabilities from the CLI and infrastructure around them, so generation, analysis, execution, and future workflows can evolve as plugins. The same foundation can support failure analysis, self-healing test experiments, API test generation, and accessibility testing without turning the CLI into a monolith.
 
 ## Architecture
 
 ```mermaid
-flowchart LR
-    CLI[CLI] -->|load / plugins| Loader[Plugin Loader]
-    Loader --> Registry[Capability Registry]
-    CLI -->|list / run| Registry
-    Registry --> Generator[Playwright Generator]
-    Generator --> Analyzer[Project Analyzer]
-    Analyzer --> Prompt[Prompt Builder]
-    Prompt --> Provider[LLM Provider]
-    Provider --> Generator
-    Generator --> Artifact[Generated test artifact]
+flowchart TD
+    CLI[CLI]
+    Loader[Plugin Loader]
+    Registry[Capability Registry]
+    Generator[Playwright Generator Capability]
+    Analyzer[Project Analyzer]
+    Context[Context Builder]
+    Prompt[Prompt Builder]
+    Factory[LLM Provider Factory]
+    Mock[Mock Provider]
+    OpenAI[OpenAI Provider]
+    Artifact[Generated Test Artifact]
+    Executor[Playwright Execution Engine]
+    Result[Structured Execution Result]
 
+    CLI --> Loader --> Registry --> Generator
+    Generator --> Analyzer --> Prompt
+    Factory --> Mock
+    Factory --> OpenAI
+    Factory --> Generator
+    Generator --> Artifact
     CLI -->|analyze| Analyzer
-    Analyzer --> Context[Context Builder]
     CLI -->|context| Context
-    CLI -->|prompt-preview| Prompt
+    Analyzer --> Context
+    CLI -->|execute| Executor --> Result
+    Artifact -. manually supplied to execute .-> Executor
 ```
 
-The default provider is deterministic and local (`mock`). An OpenAI Responses API adapter and environment-based provider selection are implemented, but live OpenAI generation has not yet been validated in this project.
+The generation and execution commands are deliberately separate today. The Context Builder is available through the `context` command; generation currently builds its prompt directly from Project Analyzer output.
 
 ## Current Features
 
-- Typed capability SDK and duplicate-safe capability registry.
-- Centralized plugin loader with built-in plugin metadata and an external-plugin extension point.
-- `list` and `run` CLI commands for discovering and executing capabilities.
-- Recursive Playwright project analysis for config, page objects, fixtures, and test files.
-- Bounded context selection, configurable file truncation, and estimated token counts.
-- Context-aware Playwright prompt construction using existing project conventions.
-- Deterministic mock LLM provider for local development without credentials or network calls.
-- End-to-end Playwright generation that writes `generated/generated.spec.ts` by default.
-- Optional OpenAI provider adapter using the official SDK and Responses API; live API validation is pending.
+- TypeScript CLI with `list`, `plugins`, `run`, `analyze`, `context`, `config-check`, `prompt-preview`, `llm-test`, and `execute` commands
+- Capability SDK and registry for typed, reusable capabilities
+- Built-in Plugin Loader that keeps capability registration out of the CLI
+- Recursive Playwright project analysis for configuration, fixtures, page objects, and tests
+- Context selection, per-file truncation, character counts, and estimated token counts
+- Project-aware Playwright prompt construction
+- YAML project configuration validated with Zod
+- Deterministic mock LLM provider for local development
+- OpenAI provider implemented with the official SDK, Responses API, configurable models, and transient-failure retries
+- Environment and project-configuration provider selection, with `LLM_PROVIDER` taking priority
+- End-to-end mock-provider Playwright test generation
+- Generated output resolved safely inside the target project and preferably under Playwright's configured `testDir`
+- Playwright execution via a spawned `npx playwright test` process
+- Structured JSON report parsing with test totals, pass/fail/skip counts, output capture, duration, and report path
+
+### Verification status
+
+- Mock-provider generation has been exercised successfully during development.
+- Path resolution and JSON report parsing are covered by unit tests.
+- The execution engine is implemented and type-checked, but this repository's automated tests do not run a real external Playwright project.
+- The OpenAI provider is implemented and type-checked. It does not have a dedicated unit test, and a live OpenAI request has not been verified in this repository.
 
 ## Roadmap
 
-- [x] Capability SDK and registry
-- [x] CLI discovery and capability execution
-- [x] Playwright project analyzer
-- [x] Context builder and token estimation
-- [x] Playwright prompt builder
-- [x] Mock LLM provider
-- [x] End-to-end generated test artifact
-- [x] OpenAI provider adapter and environment-based selection
-- [ ] Validate generation against the live OpenAI API
-- [ ] Add automated unit and integration test coverage
-- [ ] Add generated-code validation and repair
-- [ ] Add failure analysis and flaky-test detection capabilities
-- [ ] Add accessibility and API testing capabilities
+### Completed
+
+- [x] TypeScript project foundation
+- [x] CLI
+- [x] Capability SDK
+- [x] Capability Registry
+- [x] Built-in Plugin Loader
+- [x] Playwright Project Analyzer
+- [x] Context Builder
+- [x] Prompt Builder
+- [x] YAML project configuration
+- [x] Mock LLM Provider
+- [x] OpenAI Provider implementation
+- [x] Playwright Test Generator
+- [x] Generated test artifact creation
+- [x] Playwright Execution Engine
+- [x] Structured execution results
+- [x] Unit tests for execution path resolution and report parsing
+
+### In Progress
+
+- [ ] Live OpenAI API integration verification
+- [ ] Generated-code validation and sanitization
+- [ ] Prompt-quality improvements
+
+### Planned
+
+- [ ] AI Failure Analyzer
+- [ ] Screenshot, trace, and video collection
+- [ ] Console and network-log collection
+- [ ] Self-healing locator suggestions
+- [ ] Automatic retry with repaired tests
+- [ ] Flaky-test detection
+- [ ] API test generation
+- [ ] Accessibility analysis
+- [ ] GitHub Actions integration
+- [ ] Pull-request test recommendations
+- [ ] External plugin support
 
 ## Getting Started
 
-Install dependencies and create a local environment file:
+Requirements: a current Node.js release and npm. Test execution also requires Playwright to be installed in the target project.
 
 ```bash
+git clone <repository-url>
+cd AI-QE-OS
 npm install
 cp .env.example .env
+cp project.example.yml project.yml
 npm run typecheck
+npm test
 npm run dev -- list
 ```
 
-The example environment defaults to `LLM_PROVIDER=mock`, so no API key is required for the local pipeline.
+Before using project-aware commands, replace the placeholder root in `project.yml` with the path to your Playwright project.
 
-### Example Commands
+### Example commands
 
 ```bash
-npm run dev -- analyze ~/pw-fifa
-npm run dev -- context ~/pw-fifa
-npm run dev -- prompt-preview ~/pw-fifa --request "Generate a login test"
-npm run dev -- run playwright-generator --project ~/pw-fifa --request "Generate a login test"
+npm run dev -- plugins
+npm run dev -- list
+npm run dev -- analyze /path/to/playwright/project
+npm run dev -- context /path/to/playwright/project
+npm run dev -- prompt-preview /path/to/playwright/project --request "Generate a login test"
+npm run dev -- run playwright-generator --request "Generate a login test"
+npm run dev -- execute tests/generated/generated.spec.ts --project /path/to/playwright/project
 ```
 
-Use `--output <path>` with `run` to override the default `./generated` directory.
+CLI values override YAML values. For `run`, omit `--project` or `--output` to use the corresponding `project.yml` value.
 
-### Example Output
+## Configuration
 
-List registered capabilities:
+Environment variables select the provider and supply OpenAI credentials. Keep `.env` local:
+
+```dotenv
+LLM_PROVIDER=mock
+OPENAI_API_KEY=
+OPENAI_MODEL=
+OPENAI_MAX_RETRIES=2
+```
+
+`project.yml` controls the project, generation, and context defaults:
+
+```yaml
+project:
+  name: sample-playwright-project
+  root: /path/to/playwright/project
+
+llm:
+  provider: mock
+  model: mock-playwright-0.1
+
+generation:
+  outputDirectory: ./tests/generated
+
+context:
+  maxPageObjects: 5
+  maxFixtures: 5
+  maxTests: 3
+  maxCharactersPerFile: 12000
+```
+
+Provider precedence is `LLM_PROVIDER`, then `project.yml`, then `mock`. When `openai` is selected, `OPENAI_API_KEY` and a model from `OPENAI_MODEL` or YAML configuration are required.
+
+Validate configuration with:
+
+```bash
+npm run dev -- config-check
+npm run dev -- config-check --config ./project.yml
+```
+
+## Example Output
+
+### Plugins
+
+```text
+Loaded plugins:
+- Playwright Generator Plugin (builtin.playwright-generator) v0.1.0
+```
+
+### Capabilities
 
 ```text
 AI-QE OS
@@ -90,22 +193,21 @@ AI-QE OS
 - Playwright Test Generator (playwright-generator) v0.1.0
 ```
 
-Analyze a Playwright project:
+### Project analysis
 
 ```text
 Playwright config: playwright.config.ts
 Number of page objects: 2
-- pages/LoginPage.ts
-- pages/HomePage.ts
+- pages/login-page.ts
+- pages/home-page.ts
 Number of fixtures: 1
 - fixtures/auth.fixture.ts
-Number of tests found: 3
+Number of tests found: 2
 - tests/login.spec.ts
 - tests/navigation.spec.ts
-- tests/profile.spec.ts
 ```
 
-Generate a test with the default mock provider:
+### Generation
 
 ```text
 Capability: Playwright Test Generator
@@ -114,26 +216,70 @@ Summary: Generated a Playwright test with mock/mock-playwright-0.1.
 Warnings:
 - None
 Generated:
-generated/generated.spec.ts
+/path/to/playwright/project/tests/generated/generated.spec.ts
 ```
+
+### Execution
+
+```text
+Test file: /path/to/playwright/project/tests/generated/generated.spec.ts
+Status: PASS
+Exit code: 0
+Duration: 1842 ms
+Report: /path/to/playwright/project/test-results/ai-qe-os/playwright-report.json
+Total: 3
+Passed: 3
+Failed: 0
+Skipped: 0
+```
+
+Exact counts, paths, duration, and Playwright output depend on the target project.
 
 ## Project Structure
 
 ```text
-apps/cli/                              Command-line interface
-packages/capability-sdk/               Shared capability contracts
-packages/core/                         Capability registry
-packages/project-analyzer/             Playwright project discovery
-packages/context-builder/              Bounded context and token estimates
-packages/llm/                          Mock and OpenAI provider adapters
-packages/capabilities/
-  playwright-generator/                Prompt builder and generation pipeline
+apps/
+  cli/                         Command-line interface
+packages/
+  capability-sdk/              Capability contracts and registry
+  capabilities/
+    playwright-generator/      Analyzer-to-artifact generation capability
+  context-builder/             Context selection and size estimation
+  core/                        YAML configuration and built-in Plugin Loader
+  execution-engine/            Playwright process execution and report parsing
+  llm/                         Provider contracts, factory, mock, and OpenAI providers
+  project-analyzer/            Playwright project discovery and file reading
+project.example.yml            Safe project configuration template
+.env.example                   Safe environment variable template
 ```
+
+## Testing
+
+Run the repository checks with:
+
+```bash
+npm run typecheck
+npm test
+```
+
+The test suite covers generated-test path resolution and Playwright JSON report parsing. Provider calls and real target-project Playwright execution are not part of the automated suite.
+
+## Current Limitations
+
+- External plugin discovery is not implemented; the loader currently registers built-in plugins only.
+- Generation and execution are separate commands; generated tests are not run automatically.
+- The Context Builder is not yet wired into the generator pipeline.
+- Playwright `testDir` detection supports common static configuration forms, not arbitrary runtime expressions.
+- Real OpenAI requests require API billing, a valid API key, model access, and network availability.
+- Live OpenAI generation has not yet been verified.
+- Automatic failure analysis is not yet implemented.
+- Screenshot, trace, video, console, and network analysis are not yet implemented.
+- JSON report parsing is tolerant of missing or malformed reports, but HTML report integration is not implemented.
 
 ## Security
 
-Never commit `.env`. It may contain API credentials and is intentionally ignored by Git. Commit only `.env.example`, keep secrets out of prompts and generated artifacts, and review generated tests before running them against real systems.
+Never commit `.env` or API keys. `project.yml` is also ignored because it can contain local or machine-specific paths. Commit only `.env.example` and `project.example.yml`, keeping both free of credentials and personal filesystem paths.
 
 ## License
 
-Licensed under the ISC License.
+This project is licensed under the ISC License.
