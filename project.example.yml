@@ -1,0 +1,16 @@
+project:
+  name: playwright-project
+  root: .
+
+llm:
+  provider: mock
+  model: mock-playwright-0.1
+
+generation:
+  outputDirectory: ./generated
+
+context:
+  maxPageObjects: 5
+  maxFixtures: 5
+  maxTests: 3
+  maxCharactersPerFile: 12000

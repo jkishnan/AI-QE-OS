@@ -14,11 +14,13 @@ test("placeholder test", async ({ page }) => {
 export class MockLlmProvider implements LlmProvider {
   readonly name = "mock";
 
+  constructor(private readonly model = "mock-playwright-0.1") {}
+
   async generate(_request: GenerateRequest): Promise<GenerateResponse> {
     return {
       text: PLACEHOLDER_PLAYWRIGHT_TEST,
       provider: this.name,
-      model: "mock-playwright-0.1",
+      model: this.model,
     };
   }
 }

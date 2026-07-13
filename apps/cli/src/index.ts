@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { config as loadEnvironment } from "dotenv";
 import process from "node:process";
 import {
   buildPlaywrightPrompt,
@@ -7,10 +8,17 @@ import {
 import { ContextBuilder } from "../../../packages/context-builder/src/context-builder.js";
 import { CapabilityRegistry } from "../../../packages/core/src/capability-registry.js";
 import {
+  loadProjectConfig,
+  ProjectConfigFileNotFoundError,
+} from "../../../packages/core/src/config.js";
+import type { ProjectConfig } from "../../../packages/core/src/config.js";
+import {
   createLlmProvider,
   MockLlmProvider,
 } from "../../../packages/llm/src/index.js";
 import { ProjectAnalyzer } from "../../../packages/project-analyzer/src/project-analyzer.js";
+
+loadEnvironment({ quiet: true });
 
 const program = new Command();
 const registry = new CapabilityRegistry();
@@ -18,12 +26,31 @@ registry.register(new PlaywrightGeneratorCapability(createLlmProvider()));
 
 interface RunOptions {
   request: string;
-  project: string;
-  output: string;
+  project?: string;
+  output?: string;
+  config?: string;
 }
 
 interface PromptPreviewOptions {
   request: string;
+}
+
+interface ConfigCheckOptions {
+  config: string;
+}
+
+async function loadRunConfig(configPath?: string): Promise<ProjectConfig | null> {
+  const resolvedPath = configPath ?? "./project.yml";
+
+  try {
+    return await loadProjectConfig(resolvedPath);
+  } catch (error) {
+    if (!configPath && error instanceof ProjectConfigFileNotFoundError) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 program
@@ -56,15 +83,24 @@ program
   .command("run <id>")
   .description("Run a registered capability")
   .requiredOption("--request <text>", "Capability request")
-  .option("--project <path>", "Project root", ".")
-  .option("--output <path>", "Output directory", "./generated")
+  .option("--project <path>", "Project root")
+  .option("--output <path>", "Output directory")
+  .option("--config <path>", "Project configuration file")
   .action(async (id: string, options: RunOptions) => {
     try {
-      const capability = registry.get(id);
+      const config = await loadRunConfig(options.config);
+      const runRegistry = new CapabilityRegistry();
+      runRegistry.register(
+        new PlaywrightGeneratorCapability(
+          createLlmProvider(config?.llm.provider, config?.llm.model)
+        )
+      );
+      const capability = runRegistry.get(id);
       const context = {
-        projectRoot: options.project,
+        projectRoot: options.project ?? config?.project.root ?? ".",
         request: options.request,
-        outputDirectory: options.output,
+        outputDirectory:
+          options.output ?? config?.generation.outputDirectory ?? "./generated",
       };
 
       await capability.validate(context);
@@ -99,6 +135,23 @@ program
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Unable to run capability "${id}": ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("config-check")
+  .description("Validate an AI-QE OS project configuration")
+  .option("--config <path>", "Project configuration file", "./project.yml")
+  .action(async (options: ConfigCheckOptions) => {
+    try {
+      const config = await loadProjectConfig(options.config);
+
+      console.log("Validated configuration:");
+      console.log(JSON.stringify(config, null, 2));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Configuration error: ${message}`);
       process.exitCode = 1;
     }
   });

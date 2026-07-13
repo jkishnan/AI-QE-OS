@@ -8,9 +8,12 @@ import type {
 export class OpenAiProvider implements LlmProvider {
   readonly name = "openai";
 
+  constructor(private readonly configuredModel?: string) {}
+
   async generate(request: GenerateRequest): Promise<GenerateResponse> {
     const apiKey = process.env.OPENAI_API_KEY?.trim();
-    const model = process.env.OPENAI_MODEL?.trim();
+    const model =
+      process.env.OPENAI_MODEL?.trim() || this.configuredModel?.trim();
 
     if (!apiKey) {
       throw new Error("OPENAI_API_KEY is required when LLM_PROVIDER=openai");
