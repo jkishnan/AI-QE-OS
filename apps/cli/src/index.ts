@@ -12,6 +12,7 @@ import {
   listLoadedPlugins,
   loadCapabilities,
 } from "../../../packages/core/src/plugin-loader.js";
+import { PlaywrightExecutor } from "../../../packages/execution-engine/src/index.js";
 import {
   createLlmProvider,
   MockLlmProvider,
@@ -36,6 +37,10 @@ interface PromptPreviewOptions {
 
 interface ConfigCheckOptions {
   config: string;
+}
+
+interface ExecuteOptions {
+  project: string;
 }
 
 async function loadRunConfig(configPath?: string): Promise<ProjectConfig | null> {
@@ -270,6 +275,39 @@ program
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Unable to build project context: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("execute <test-file>")
+  .description("Execute a Playwright test file")
+  .requiredOption("--project <project-root>", "Playwright project root")
+  .action(async (testFile: string, options: ExecuteOptions) => {
+    try {
+      const result = await new PlaywrightExecutor().execute(
+        testFile,
+        options.project
+      );
+
+      console.log(`Test file: ${result.testFile}`);
+      console.log(`Status: ${result.success ? "PASS" : "FAIL"}`);
+      console.log(`Exit code: ${result.exitCode}`);
+      console.log(`Duration: ${result.durationMs} ms`);
+      console.log("Stdout:");
+      console.log(result.stdout || "(empty)");
+
+      if (result.stderr.length > 0) {
+        console.log("Stderr:");
+        console.log(result.stderr);
+      }
+
+      if (!result.success) {
+        process.exitCode = 1;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Unable to execute Playwright test: ${message}`);
       process.exitCode = 1;
     }
   });
